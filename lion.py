@@ -1,31 +1,36 @@
-import requests
-from io import BytesIO
+from diffusers import StableDiffusionImg2ImgPipeline
+import torch
 from PIL import Image
 
-API_URL = "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5"
-API_TOKEN = "YOUR_HUGGING_FACE_API_TOKEN"
+# Load the Stable Diffusion model
+pipe = StableDiffusionImg2ImgPipeline.from_pretrained("runwayml/stable-diffusion-v1-5", torch_dtype=torch.float32)  # Use float32 for CPU
+pipe = pipe.to("cpu")  # Use CPU instead of CUDA
 
-def load_image(path_to_image):
-    image = Image.get(path_to_image).convert('RGB')
-    return image
+# Load the base image as a PIL Image
+try:
+    base_image = Image.open("base_image.jpg").convert("RGB")  # Ensure the image is in RGB format
+except Exception as e:
+    print(f"Error loading image: {e}")
+    exit()
 
-def generate_image(prompt,base_image_url,output = "output.png"):
-    base_image = load_image(base_image_url)
-    base_image = base_image.resize((512,512))
+# Define a neutral prompt
+prompt = "A cartoon-style character preparing food in a kitchen, maintaining the original character's appearance and style."
 
-    image_bytes = BytesIO()
-    base_image.save(image_bytes, format = "PNG")
-    image_bytes = image_bytes.getvalue()
+# Generate the image
+try:
+    output_image = pipe(
+        prompt=prompt,
+        image=base_image,  # Pass the PIL Image directly
+        strength=0.75,  # Controls how much the base image is modified
+        guidance_scale=0.5  # Controls how closely the output follows the prompt
+    ).images[0]
+except Exception as e:
+    print(f"Error generating image: {e}")
+    exit()
 
-    headers = {"Authorization": f"Bearer {API_TOKEN}"}
-    payload = {
-        "inputs": prompt,
-        "image": image_bytes,
-        "parameters": {
-            "strength": 0.75,  # Controls how much the base image is modified
-            "guidance_scale": 7.5,  # Controls how closely the output follows the prompt
-            "num_inference_steps": 50,  # Number of denoising steps
-        },
-    }
-
-    response = requests.post(API_URL,)
+# Save the output image
+try:
+    output_image.save("output_image.png")
+    print("Image generated successfully and saved to output_image.png")
+except Exception as e:
+    print(f"Error saving image: {e}")
